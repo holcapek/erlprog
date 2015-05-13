@@ -6,6 +6,7 @@
 
 -module(sideff).
 -export([printall/1, printeven/1]).
+-include_lib("eunit/include/eunit.hrl").
 
 printall(N, N) ->
   io:format("Number:~p~n", [ N ]);
@@ -24,3 +25,15 @@ printeven(N, I) when I rem 2 == 1 ->
   printeven(N, I + 1).
 printeven(N) when N > 0 ->
   printeven(N, 2).
+
+printall_test_() ->
+  [
+    ?_assertException(error, function_clause, printall(0))
+  , ?_assert(printall(1) =:= ok)
+  ].
+
+printeven_test_() ->
+  [
+    ?_assertException(error, function_clause, printeven(0))
+  , ?_assert(printeven(1) =:= ok)
+  ].
