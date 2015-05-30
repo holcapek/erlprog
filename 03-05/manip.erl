@@ -26,7 +26,7 @@ reverse([ H | T ], Rev) ->
   reverse(T, [ H | Rev ]).
 reverse(L) ->
   reverse(L, []).
- 
+
 concatenate([], L) ->
   L;
 concatenate([ H | T ], L) ->
@@ -60,4 +60,4 @@ concatenate_test() ->
 flatten_test() ->
   [] = flatten([]),
   [ 1, 2, 3, 4, 5, 6, 7, 8 ] = flatten([ [ 1 ], [ [ 2, 3 ], [ 4, 5 ] ], [ [ [ 6 ], [ 7 ], [ 8 ] ] ] ]).
-  
+
