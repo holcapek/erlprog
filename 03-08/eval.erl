@@ -95,6 +95,28 @@ parse2_binop(L) ->
   { E2, T1 } = parse2(T),
   { { Op, E1, E2 }, T1 }.
 
+eval({ '~', E }) ->
+  R = eval(E),
+  -R;
+eval({ num, N }) ->
+  N;
+eval({ '+', E1, E2 }) ->
+  R1 = eval(E1),
+  R2 = eval(E2),
+  R1 + R2;
+eval({ '-', E1, E2 }) ->
+  R1 = eval(E1),
+  R2 = eval(E2),
+  R1 - R2;
+eval({ '*', E1, E2 }) ->
+  R1 = eval(E1),
+  R2 = eval(E2),
+  R1 * R2;
+eval({ '/', E1, E2 }) ->
+  R1 = eval(E1),
+  R2 = eval(E2),
+  R1 / R2.
+
 parse(L) ->
   { E, [] } = parse2(L),
   E.
