@@ -69,11 +69,13 @@ tokenize_num(T, N) -> [ {num, N} | tokenize(T) ].
 
 tokenize_float([ H | T ], N, E) when H >= $0, H =< $9 ->
   tokenize_float(T, N + (H - $0)/E, E * 10);
-tokenize_float(T, N, _) -> [ {num, N} | tokenize(T) ].
+tokenize_float(T, N, _) ->
+  [ {num, N} | tokenize(T) ].
 
 tokenize_test() ->
   [ '~', '(', '(', {num, 2}, '*', {num, 3}, ')',
-    '+', '(', {num, 3}, '*', {num, 4}, ')', ')' ] = tokenize("~((2*3)+(3*4))").
+    '+', '(', {num, 3}, '*', {num, 4}, ')', ')' ] 
+    = tokenize("~((2*3)+(3*4))").
 
 parse2([ {num, N} | T ]) ->
   { {num, N}, T };
@@ -94,6 +96,15 @@ parse2_binop(L) ->
   end,
   { E2, T1 } = parse2(T),
   { { Op, E1, E2 }, T1 }.
+
+parse(L) ->
+  { E, [] } = parse2(L),
+  E.
+
+parse_test() ->
+  { '~', { '+', { '*', {num, 2}, {num, 3} },
+  { '*', { num, 3 }, {num, 4 } } } }
+    = parse(tokenize("~((2*3)+(3*4))")).
 
 eval({ '~', E }) ->
   R = eval(E),
@@ -117,9 +128,8 @@ eval({ '/', E1, E2 }) ->
   R2 = eval(E2),
   R1 / R2.
 
-parse(L) ->
-  { E, [] } = parse2(L),
-  E.
+eval_test() ->
+  1/12 = eval(parse(tokenize("~((1-2)/(3*4))"))).
 
 print2({ '~', E }) ->
   [ $~ ] ++ print2(E);
@@ -138,3 +148,47 @@ print2({ '/', E1, E2 }) ->
 
 print(E) ->
   lists:flatten(print2(E)).
+
+print_test() ->
+  "~((1-2)/(3*4))" = print(parse(tokenize("~((1-2)/(3*4))"))).
+
+compile2({ '~', E }) ->
+  [ compile2(E), '~' ];
+compile2({ num, N }) ->
+  [ N ];
+compile2({ Op, E1, E2 }) ->
+  [ compile2(E1), compile2(E2), Op ].
+
+compile(E) ->
+  lists:flatten(compile2(E)).
+
+compile_test() ->
+  [ 1, 2, '-', 3, 4, '*', '/', '~' ]
+    = compile(parse(tokenize("~((1-2)/(3*4))"))).
+
+simulate([], [ N ])
+when is_number(N) ->
+  N;
+simulate([ N | IT ], OT)
+when is_number(N) ->
+  simulate(IT, [ N | OT ]);
+simulate([ '~' | IT ], [ N | OT ])
+when is_number(N) ->
+  simulate(IT, [ -N | OT ]);
+simulate([ '+' | IT ], [ N1, N2 | OT ])
+when is_number(N1), is_number(N2) ->
+  simulate(IT, [ N2 + N1 | OT ]);
+simulate([ '-' | IT ], [ N1, N2 | OT ])
+when is_number(N1), is_number(N2) ->
+  simulate(IT, [ N2 - N1 | OT ]);
+simulate([ '*' | IT ], [ N1, N2 | OT ])
+when is_number(N1), is_number(N2) ->
+  simulate(IT, [ N2 * N1 | OT ]);
+simulate([ '/' | IT ], [ N1, N2 | OT ])
+when is_number(N1), is_number(N2) ->
+  simulate(IT, [ N2 / N1 | OT ]).
+
+simulate(L) -> simulate(L, []).
+
+simulate_test() ->
+  1/12 = simulate(compile(parse(tokenize("~((1-2)/(3*4))")))).
