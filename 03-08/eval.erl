@@ -98,3 +98,21 @@ parse2_binop(L) ->
 parse(L) ->
   { E, [] } = parse2(L),
   E.
+
+print2({ '~', E }) ->
+  [ $~ ] ++ print2(E);
+print2({ num, N }) ->
+  % just returning N would cause the list not to be recognized
+  % as a pritable string
+  io_lib:write(N);
+print2({ '+', E1, E2 }) ->
+  [ $(, print2(E1), $+, print2(E2), $) ];
+print2({ '-', E1, E2 }) ->
+  [ $(, print2(E1), $-, print2(E2), $) ];
+print2({ '*', E1, E2 }) ->
+  [ $(, print2(E1), $*, print2(E2), $) ];
+print2({ '/', E1, E2 }) ->
+  [ $(, print2(E1), $/, print2(E2), $) ].
+
+print(E) ->
+  lists:flatten(print2(E)).
