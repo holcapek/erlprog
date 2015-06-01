@@ -57,13 +57,16 @@ tokenize([ $/ | T ]) -> [ '/' | tokenize(T) ];
 tokenize([ $~ | T ]) -> [ '~' | tokenize(T) ];
 tokenize([ $( | T ]) -> [ '(' | tokenize(T) ];
 tokenize([ $) | T ]) -> [ ')' | tokenize(T) ];
+tokenize("if"   ++ T)  -> [ 'if'   | tokenize(T) ];
+tokenize("then" ++ T)  -> [ 'then' | tokenize(T) ];
+tokenize("else" ++ T)  -> [ 'else' | tokenize(T) ];
 % number
 tokenize([ N | T ]) when N >= $0, N =< $9 ->
   tokenize_num(T, N - $0).
 
 tokenize_num([ H | T ], N) when H >= $0, H =< $9 ->
   tokenize_num(T, N * 10 + H - $0);
-tokenize_num([ H | T ], N) when H == $. ->
+tokenize_num([ $. | T ], N) ->
   tokenize_float(T, N, 10);
 tokenize_num(T, N) -> [ {num, N} | tokenize(T) ].
 
@@ -73,9 +76,12 @@ tokenize_float(T, N, _) ->
   [ {num, N} | tokenize(T) ].
 
 tokenize_test() ->
-  [ '~', '(', '(', {num, 2}, '*', {num, 3}, ')',
+  [ '~', '(', '(', {num, 2}, '+', {num, 3}, ')',
     '+', '(', {num, 3}, '*', {num, 4}, ')', ')' ] 
-    = tokenize("~((2*3)+(3*4))").
+    = tokenize("~((2+3)+(3*4))"),
+  [ 'if', '(', '(', {num, 2}, '+', {num, 3}, ')', '-', {num,4}, ')', 'then', {num, 4}, 'else',
+    '~', '(', '(', {num, 2}, '*', {num, 3}, ')', '+', '(', {num, 3}, '*', {num, 4}, ')', ')' ]
+    = tokenize("if ((2+3)-4) then 4 else ~((2*3)+(3*4))").
 
 parse2([ {num, N} | T ]) ->
   { {num, N}, T };
@@ -84,7 +90,12 @@ parse2([ '~' | T ]) ->
   { { '~', E }, T1 };
 parse2([ '(' | T ]) ->
   { E, [ ')' | T1 ] } = parse2_binop(T),
-  { E, T1 }.
+  { E, T1 };
+parse2([ 'if' | T ]) ->
+  { C,  [ 'then' | T1 ] } = parse2(T),
+  { E1, [ 'else' | T2 ] } = parse2(T1),
+  { E2, T3 } = parse2(T2),
+  { { 'if', C, E1, E2 }, T3 }.
 
 parse2_binop(L) ->
   { E1, [ Op | T ] } = parse2(L),
@@ -104,7 +115,11 @@ parse(L) ->
 parse_test() ->
   { '~', { '+', { '*', {num, 2}, {num, 3} },
   { '*', { num, 3 }, {num, 4 } } } }
-    = parse(tokenize("~((2*3)+(3*4))")).
+    = parse(tokenize("~((2*3)+(3*4))")),
+  { 'if', { '-', { '+', { num, 2}, {num, 3} }, {num, 4} },
+    {num, 4},
+    { '~', { '+', { '*', {num, 2}, {num, 3} }, { '*', {num, 3}, {num,4 } } } } }
+    = parse(tokenize("if ((2+3)-4) then 4 else ~((2*3)+(3*4))")).
 
 eval({ '~', E }) ->
   R = eval(E),
@@ -126,10 +141,17 @@ eval({ '*', E1, E2 }) ->
 eval({ '/', E1, E2 }) ->
   R1 = eval(E1),
   R2 = eval(E2),
-  R1 / R2.
+  R1 / R2;
+eval({ 'if', C, E1, E2 }) ->
+  C1 = eval(C),
+  case C1 of
+    0 -> eval(E1);
+    _ -> eval(E2)
+  end.
 
 eval_test() ->
-  1/12 = eval(parse(tokenize("~((1-2)/(3*4))"))).
+  1/12 = eval(parse(tokenize("~((1-2)/(3*4))"))),
+  -18 = eval(parse(tokenize("if ((2+3)-4) then 4 else ~((2*3)+(3*4))"))).
 
 print2({ '~', E }) ->
   [ $~ ] ++ print2(E);
@@ -144,27 +166,35 @@ print2({ '-', E1, E2 }) ->
 print2({ '*', E1, E2 }) ->
   [ $(, print2(E1), $*, print2(E2), $) ];
 print2({ '/', E1, E2 }) ->
-  [ $(, print2(E1), $/, print2(E2), $) ].
+  [ $(, print2(E1), $/, print2(E2), $) ];
+print2({ 'if', C, E1, E2 }) ->
+  [ "if ", print2(C), " then ", print2(E1), " else ", print2(E2) ].
 
 print(E) ->
   lists:flatten(print2(E)).
 
 print_test() ->
-  "~((1-2)/(3*4))" = print(parse(tokenize("~((1-2)/(3*4))"))).
+  "~((1-2)/(3*4))" = print(parse(tokenize("~((1-2)/(3*4))"))),
+  "if ((2+3)-4) then 4 else ~((2*3)+(3*4))"
+    = print(parse(tokenize("if ((2+3)-4) then 4 else ~((2*3)+(3*4))"))).
 
 compile2({ '~', E }) ->
   [ compile2(E), '~' ];
 compile2({ num, N }) ->
   [ N ];
 compile2({ Op, E1, E2 }) ->
-  [ compile2(E1), compile2(E2), Op ].
+  [ compile2(E1), compile2(E2), Op ];
+compile2({ 'if', C, E1, E2 }) ->
+  [ compile2(E1), compile2(E2), compile(C), 'if' ].
 
 compile(E) ->
   lists:flatten(compile2(E)).
 
 compile_test() ->
   [ 1, 2, '-', 3, 4, '*', '/', '~' ]
-    = compile(parse(tokenize("~((1-2)/(3*4))"))).
+    = compile(parse(tokenize("~((1-2)/(3*4))"))),
+  [ 3, 4, '*', 5, 6, '/', 1, 2, '+', 'if' ]
+    = compile(parse(tokenize("if (1+2) then (3*4) else (5/6)"))).
 
 simulate([], [ N ])
 when is_number(N) ->
@@ -186,12 +216,18 @@ when is_number(N1), is_number(N2) ->
   simulate(IT, [ N2 * N1 | OT ]);
 simulate([ '/' | IT ], [ N1, N2 | OT ])
 when is_number(N1), is_number(N2) ->
-  simulate(IT, [ N2 / N1 | OT ]).
+  simulate(IT, [ N2 / N1 | OT ]);
+simulate([ 'if' | IT ], [ C, E2, E1 | OT ]) ->
+  case C of
+    0 -> simulate(IT, [ E1 |OT ]);
+    _ -> simulate(IT, [ E2 |OT ])
+  end.
 
 simulate(L) -> simulate(L, []).
 
 simulate_test() ->
-  1/12 = simulate(compile(parse(tokenize("~((1-2)/(3*4))")))).
+  1/12 = simulate(compile(parse(tokenize("~((1-2)/(3*4))")))),
+  5/6 = simulate(compile(parse(tokenize("if (1+2) then (3*4) else (5/6)")))).
 
 simplify({ num, N }) -> { num, N };
 simplify({ '+', { num, N }, { num, 0 } }) -> { num, N };
