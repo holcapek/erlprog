@@ -192,3 +192,23 @@ simulate(L) -> simulate(L, []).
 
 simulate_test() ->
   1/12 = simulate(compile(parse(tokenize("~((1-2)/(3*4))")))).
+
+simplify({ num, N }) -> { num, N };
+simplify({ '+', { num, N }, { num, 0 } }) -> { num, N };
+simplify({ '+', { num, 0 }, { num, N } }) -> { num, N };
+simplify({ '-', { num, N }, { num, N } }) -> { num, 0 };
+simplify({ '*', { num, N }, { num, 1 } }) -> { num, N };
+simplify({ '*', { num, 1 }, { num, N } }) -> { num, N };
+simplify({ '*', { num, 0 }, { num, _ } }) -> { num, 0 };
+simplify({ '*', { num, _ }, { num, 0 } }) -> { num, 0 };
+simplify({ '/', { num, 0 }, { num, _ } }) -> { num, 0 };
+simplify({ '~', E }) -> { '~', simplify(E) };
+simplify({ Op, E1, E2 })
+when Op == '+'; Op == '-'; Op == '*'; Op == '/' ->
+  E3 = { Op, simplify(E1), simplify(E2) },
+  simplify(E3).
+
+simplify_test() ->
+  { num, 0 } = simplify(parse(tokenize("((0+1)-(1+0))"))),
+  { num, 0 } = simplify(parse(tokenize("((3*0)/(3*1))"))),
+  { num, 0 } = simplify(parse(tokenize("((0*3)/(1*3))"))).
