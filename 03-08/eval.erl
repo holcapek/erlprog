@@ -37,7 +37,7 @@
 % where the value returned is the “then” value if the “if” expression evaluates to 0 , and
 % it is the “else” value otherwise.
 %
-% You could also add local definitions, such as the following:
+% TODO You could also add local definitions, such as the following:
 %
 % let c = ((2+3)-4) in ~((2*c)+(3*4))
 %
